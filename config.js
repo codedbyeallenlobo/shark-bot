@@ -103,7 +103,12 @@ module.exports = {
   // 'console'  — coloured banner + terminal bell, no setup, always works
   // 'telegram' — free; needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
   // 'webhook'  — Make.com / n8n / your own; needs NOTIFY_WEBHOOK_URL
-  NOTIFY_CHANNELS: ['console'],
+  // Telegram is listed by default but costs nothing when unconfigured:
+  // viaTelegram() returns false the moment TELEGRAM_BOT_TOKEN or
+  // TELEGRAM_CHAT_ID is missing, so it is a no-op until you set them.
+  // Override with NOTIFY_CHANNELS=console,telegram,webhook in .env.
+  NOTIFY_CHANNELS: (process.env.NOTIFY_CHANNELS || 'console,telegram')
+    .split(',').map(s => s.trim()).filter(Boolean),
 
   // ─── ENDPOINTS ─────────────────────────────────────────────────────────
   REST_BASE: 'https://api.sharkexchange.in',

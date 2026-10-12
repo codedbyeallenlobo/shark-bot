@@ -95,6 +95,18 @@ const path = require('path');
 const readline = require('readline');
 const { io } = require('socket.io-client');
 const ex = require('./lib/exchange');
+const notify = require('./lib/notify');
+
+/**
+ * Fire-and-forget alert. A notification must NEVER delay or block an exit, so
+ * this deliberately does not return a promise to await and swallows every
+ * failure. Telegram being down is not a reason to hold a position open.
+ */
+function alert(text) {
+  try {
+    notify.send(`${SYMBOL || 'bot'}: ${text}`).catch(() => { /* never throws */ });
+  } catch (e) { /* never throws */ }
+}
 
 // ─── CLI parsing ─────────────────────────────────────────────────────────
 
@@ -2538,6 +2550,12 @@ async function checkAccountCaps() {
         error('  Every bot on this account is closing its position and stopping.');
         error(`  Delete ${path.basename(BAIL_FILE)} before restarting, or they refuse to start.`);
         error('='.repeat(70));
+        // Only the bot that WON the exclusive write alerts. The other eight
+        // see the file and flatten too, but nine identical messages would
+        // make the channel useless.
+        alert(`BAIL-OUT (floating) — open positions ${signed(floatingPnl)} INR past ` +
+              `-${BAIL_FLOATING_INR}. All bots flattening and stopping. ` +
+              `They will NOT restart until FINALEPIC_BAIL is deleted.`);
       } catch (e) { error(`could not write the bail switch: ${e.message}`); }
     }
     if (alreadyBailing || floatingPnl <= -BAIL_FLOATING_INR) {
@@ -2560,6 +2578,9 @@ async function checkAccountCaps() {
         error('  Every bot on this account is closing its position and stopping.');
         error(`  Delete ${path.basename(BAIL_FILE)} before restarting, or they refuse to start.`);
         error('='.repeat(70));
+        alert(`BAIL-OUT (session) — account net ${signed(pnl)} INR past -${BAIL_AT_INR}. ` +
+              `All bots flattening and stopping. ` +
+              `They will NOT restart until FINALEPIC_BAIL is deleted.`);
       } catch (e) { error(`could not write the bail switch: ${e.message}`); }
     }
     if (alreadyBailing || pnl <= -BAIL_AT_INR) {
@@ -3224,6 +3245,12 @@ async function reportCrash(kind, err) {
     }
     if (openLongs.length > 0) {
       const { totalQty, avgEntry, totalNotional } = aggregate();
+      // A crash with a position still open is the single worst state this bot
+      // can reach: nothing is managing the exit and there is no stop loss.
+      // This one is worth waking someone up for.
+      alert(`CRASH with a POSITION STILL OPEN — ${totalQty} @ ${fmt(avgEntry)} ` +
+            `(${totalNotional.toFixed(2)} USDT). ${kind}: ${err && err.message}. ` +
+            `Nothing is managing this exit. Check Shark now.`);
       error('='.repeat(66));
       error(`POSITION STILL OPEN ON ${SYMBOL}: ${totalQty} @ ${fmt(avgEntry)} (${totalNotional.toFixed(2)} USDT)`);
       error('  The bot is dead.' + (!slEnabled()
