@@ -1,8 +1,12 @@
 # shark-bot
 
-A laddering trading bot for Shark Exchange USDT perpetual futures. Nine
-instances run concurrently against a single exchange account on an Oracle Cloud
-VPS, supervised by pm2.
+A trading bot for Shark Exchange USDT perpetual futures. Nine instances run
+concurrently against a single exchange account on an Oracle Cloud VPS,
+supervised by pm2.
+
+As deployed it takes a single entry per symbol and manages one exit. The code
+also supports laddering into a position over several levels (`--levels N`,
+default 4), but production runs `--levels 1`, so no averaging down happens.
 
 This repository holds what is actually deployed and running — not a prototype.
 
