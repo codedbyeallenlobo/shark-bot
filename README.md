@@ -68,7 +68,8 @@ processes.
 The exchange allows 60 requests/minute per account. The first version used 611.
 Now it is 4.8 per bot per minute, flat from 5 to 25 concurrent processes:
 
-- one websocket feed per process carries prices for all ~700 symbols
+- one websocket feed per process carries prices for every listed contract
+  (334 at the time of writing), so adding a symbol costs no extra requests
 - account snapshots are shared through `account-snapshot.json` behind a lock,
   so nine bots reading "what do I hold" costs one request, not nine
 - the mover scan is cached and lock-guarded — a second bot waits for the first
@@ -80,8 +81,8 @@ Every closed episode appends a row to `finalepic-mae.csv` with its **maximum
 adverse excursion** — how far underwater it went before it came back:
 
 ```
-ts,symbol,direction,qty,avg_entry,exit_price,mae_pct,mae_inr,
-mfe_pct,mfe_inr,pnl_inr,outcome,exit_reason,held_sec
+ts,symbol,episode,direction,levels,qty,avg_entry,exit_price,notional_inr,
+mae_pct,mae_inr,mfe_pct,mfe_inr,pnl_inr,outcome,exit_reason,held_sec
 ```
 
 Across 92 trades that data showed winners closing fast (median 9.1 min, p75
