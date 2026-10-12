@@ -1,0 +1,15 @@
+{
+  "name": "shark-momentum-bot",
+  "version": "0.1.0",
+  "description": "Dry-run momentum bot for Shark Exchange USDT perpetuals",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "stop": "touch STOP"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "socket.io-client": "^4.7.5"
+  }
+}

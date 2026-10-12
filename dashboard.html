@@ -1,0 +1,187 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>finalepicbot</title>
+<style>
+  :root{--bg:#0e1116;--card:#161b22;--line:#262d36;--tx:#e6edf3;--dim:#8b949e;
+        --up:#3fb950;--dn:#f85149;--warn:#d29922;--acc:#58a6ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+       font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+  header{display:flex;flex-wrap:wrap;gap:18px;align-items:baseline;
+         padding:14px 18px;border-bottom:1px solid var(--line);
+         position:sticky;top:0;background:var(--bg);z-index:2}
+  h1{font-size:15px;margin:0;letter-spacing:.5px}
+  .stat{display:flex;flex-direction:column}
+  .stat b{font-size:17px;font-weight:600}
+  .stat span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  main{padding:18px;display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+  .bot{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .bot.dead{opacity:.45}
+  .bot h2{margin:0 0 2px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+  .pill{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);
+        color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .pill.long{color:var(--up);border-color:var(--up)}
+  .pill.short{color:var(--dn);border-color:var(--dn)}
+  .pill.dead{color:var(--dn);border-color:var(--dn)}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px dotted #20262e}
+  .row:last-child{border:0}
+  .row span:first-child{color:var(--dim)}
+  .up{color:var(--up)} .dn{color:var(--dn)} .warn{color:var(--warn)}
+  .bar{height:4px;background:#20262e;border-radius:3px;overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;background:var(--acc)}
+  table{width:100%;border-collapse:collapse;margin-top:6px}
+  th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);font-size:12px}
+  th{color:var(--dim);font-weight:500;text-transform:uppercase;font-size:10px;letter-spacing:.5px}
+  td.n,th.n{text-align:right}
+  .panel{grid-column:1/-1;background:var(--card);border:1px solid var(--line);
+         border-radius:8px;padding:12px 14px}
+  .err{background:#3d1518;border-color:var(--dn);color:#ffb4ae}
+  .muted{color:var(--dim)}
+</style>
+
+<header>
+  <h1>FINALEPICBOT</h1>
+  <div class="stat"><span>bots</span><b id="nbots">-</b></div>
+  <div class="stat"><span>wallet</span><b id="wallet">-</b></div>
+  <div class="stat"><span>floating</span><b id="floating">-</b></div>
+  <div class="stat"><span id="rlabel">realised</span><b id="realised">-</b></div>
+  <div class="stat"><span>total</span><b id="total">-</b></div>
+  <div class="stat"><span>updated</span><b id="upd" style="font-size:12px">-</b></div>
+</header>
+
+<main id="main"></main>
+
+<script>
+var fmtInr = function (v) { return v == null ? '-' : (v >= 0 ? '+' : '') + v.toFixed(2); };
+var cls    = function (v) { return v == null ? '' : (v >= 0 ? 'up' : 'dn'); };
+var ago    = function (ms) {
+  var s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+};
+
+function botCard(b, onExchange) {
+  var p = b.position;
+  var dead = !b.alive || b.stale;
+  var side = p ? b.direction : 'flat';
+  var h = '';
+
+  h += '<div class="bot' + (dead ? ' dead' : '') + '">';
+  h += '<h2>' + b.symbol + '<span class="pill ' + (dead ? 'dead' : side.toLowerCase()) + '">' +
+       (dead ? (b.alive ? 'STALE' : 'DEAD') : side) + '</span></h2>';
+  h += '<div class="muted" style="font-size:11px;margin-bottom:6px">ep ' + b.episode +
+       ' &middot; L' + b.level + '/' + b.maxLevels +
+       ' &middot; up ' + ago(Date.now() - b.startedAt) +
+       (b.live ? '' : ' &middot; DRY RUN') + '</div>';
+
+  if (p) {
+    h += '<div class="row"><span>PnL</span><b class="' + cls(p.pnlInr) + '">' +
+         fmtInr(p.pnlInr) + ' INR</b></div>';
+    h += '<div class="row"><span>qty @ entry</span><b>' + p.qty + ' @ ' + p.avgEntry + '</b></div>';
+    h += '<div class="row"><span>price</span><b>' + (b.lastPrice == null ? '-' : b.lastPrice) + '</b></div>';
+    h += '<div class="row"><span>take profit</span><b>' + b.exits.tpTargetInr + ' INR' +
+         (b.exits.restingTp ? '' : ' <span class="dn">(NOT RESTING)</span>') + '</b></div>';
+
+    if (b.exits.restingSl) {
+      var sl = b.exits.restingSl.limitPrice
+        ? 'limit ' + b.exits.restingSl.limitPrice
+        : 'mkt ' + b.exits.restingSl.stopPrice;
+      h += '<div class="row"><span>stop</span><b>' + sl + '</b></div>';
+    }
+
+    if (b.exits.onlyRed) {
+      h += '<div class="row"><span>only-red</span><b>cut below -' +
+           (b.exits.onlyRedUsdt * b.inrRate).toFixed(1) + ' INR &middot; held ' +
+           b.exits.holdChecksSurvived + 'x</b></div>';
+    }
+
+    // Countdown to the next --max-hold-min checkpoint.
+    if (b.exits.maxHoldMin && b.exits.nextHoldCheckTs) {
+      var left = b.exits.nextHoldCheckTs - Date.now();
+      var span = b.exits.maxHoldMin * 60000;
+      var pct = Math.max(0, Math.min(100, 100 - (left / span) * 100));
+      h += '<div class="row"><span>next check</span><b class="' + (left < 30000 ? 'warn' : '') + '">' +
+           (left <= 0 ? 'due now' : ago(left)) + '</b></div>';
+      h += '<div class="bar"><i style="width:' + pct + '%"></i></div>';
+    }
+
+    // The exchange is the authority; surface any disagreement with the book.
+    if (onExchange && Math.abs(onExchange.qty - p.qty) > p.qty * 0.02) {
+      h += '<div class="row"><span class="dn">MISMATCH</span><b class="dn">exchange holds ' +
+           onExchange.qty + '</b></div>';
+    }
+  } else {
+    h += '<div class="muted" style="padding:8px 0">flat - waiting for an entry</div>';
+  }
+
+  h += '<div class="row" style="margin-top:6px"><span>session</span><b class="' +
+       cls(b.session.realisedInr) + '">' + fmtInr(b.session.realisedInr) +
+       ' INR &middot; ' + b.session.closedEpisodes + ' ep</b></div>';
+  h += '</div>';
+  return h;
+}
+
+function tick() {
+  fetch('/api').then(function (r) { return r.json(); }).then(function (d) {
+    var live = d.bots.filter(function (b) { return b.alive && !b.stale; }).length;
+    document.getElementById('nbots').textContent = live + ' / ' + d.bots.length;
+    document.getElementById('upd').textContent = new Date(d.ts).toLocaleTimeString();
+
+    var w = d.account ? d.account.walletUsdt : null;
+    var f = d.account ? d.account.floatingInr : null;
+    var r2 = d.realised ? d.realised.net : null;
+    var tot = (r2 == null || f == null) ? null : r2 + f;
+
+    document.getElementById('wallet').textContent = w == null ? '-' : w.toFixed(2) + ' U';
+    var fe = document.getElementById('floating'); fe.textContent = fmtInr(f); fe.className = cls(f);
+    var re = document.getElementById('realised'); re.textContent = fmtInr(r2); re.className = cls(r2);
+    var te = document.getElementById('total');    te.textContent = fmtInr(tot); te.className = cls(tot);
+    document.getElementById('rlabel').textContent =
+      d.realised ? 'realised ' + d.realised.hours + 'h' : 'realised';
+
+    var byS = {};
+    d.positions.forEach(function (p) { byS[p.symbol] = p; });
+
+    var html = d.bots.map(function (b) { return botCard(b, byS[b.symbol]); }).join('');
+
+    // Anything the exchange holds that no live bot is managing.
+    var orphans = d.positions.filter(function (p) { return !p.managed; });
+    if (orphans.length) {
+      html += '<div class="panel err"><b>UNMANAGED POSITIONS - no live bot is watching these</b>' +
+        '<table><tr><th>symbol</th><th>side</th><th class="n">qty</th><th class="n">entry</th>' +
+        '<th class="n">PnL INR</th><th class="n">age</th></tr>' +
+        orphans.map(function (p) {
+          return '<tr><td>' + p.symbol + '</td><td>' + p.side + '</td><td class="n">' + p.qty +
+                 '</td><td class="n">' + p.entry + '</td><td class="n ' + cls(p.pnl) + '">' +
+                 fmtInr(p.pnl) + '</td><td class="n">' +
+                 (p.openedAt ? ago(Date.now() - p.openedAt) : '-') + '</td></tr>';
+        }).join('') + '</table></div>';
+    }
+
+    if (d.realised) {
+      var q = d.realised;
+      html += '<div class="panel"><b>REALISED - last ' + q.hours + 'h</b>' +
+        '<table><tr><th>closed</th><th>won</th><th class="n">gross</th><th class="n">fees</th>' +
+        '<th class="n">net</th><th>liquidations</th></tr><tr><td>' + q.n + '</td><td>' + q.wins +
+        ' (' + (q.n ? Math.round(q.wins / q.n * 100) : 0) + '%)</td>' +
+        '<td class="n ' + cls(q.gross) + '">' + fmtInr(q.gross) + '</td>' +
+        '<td class="n dn">-' + q.fees.toFixed(2) + '</td>' +
+        '<td class="n ' + cls(q.net) + '"><b>' + fmtInr(q.net) + '</b></td>' +
+        '<td class="' + (q.liq ? 'dn' : 'muted') + '">' + (q.liq || 'none') + '</td></tr></table></div>';
+    }
+
+    if (d.error) {
+      html += '<div class="panel err"><b>exchange unreachable</b><br>' + d.error + '</div>';
+    }
+    if (!d.bots.length) {
+      html += '<div class="panel muted">No status files found. Each bot writes one once it is running.</div>';
+    }
+
+    document.getElementById('main').innerHTML = html;
+  }).catch(function () {
+    document.getElementById('upd').textContent = 'offline';
+  });
+}
+
+tick();
+setInterval(tick, 2000);
+</script>

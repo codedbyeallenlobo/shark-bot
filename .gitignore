@@ -1,0 +1,91 @@
+# ---------------------------------------------------------------------------
+# SECRETS - never commit these. The API key and secret live here, and anyone
+# who gets them can trade the account.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+oracle_shark*
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+package-lock.json
+
+# ---------------------------------------------------------------------------
+# Logs - there are 979 of these here and one is 421 MB. GitHub rejects files
+# over 100 MB, and the history would be unusable even if it did not.
+# ---------------------------------------------------------------------------
+*.log
+logs/
+finalepic-events.log
+traybot-*.log
+ipwatch.log
+npm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Trading data and results. Exclude by default: it is large, it is noisy, and
+# it contains your actual position sizes and balances.
+#
+# If you want a results file in the repo for the resume claim, add it
+# deliberately with:  git add -f <file>
+# ---------------------------------------------------------------------------
+*.csv
+dashboard_*.json
+dashboard_*.csv
+chain_trader_*.json
+chain_trader_*.csv
+bhavcopy_cache/
+bhavcopy_ohlc/
+
+# ---------------------------------------------------------------------------
+# Runtime state - per-machine, meaningless to anyone else, and actively
+# harmful if a stale copy is restored onto a running bot.
+# ---------------------------------------------------------------------------
+account-snapshot.json
+account-snapshot.lock
+bank-baseline.json
+bank-round-*.claim
+finalepic-mae.csv
+finalepic-status-*.json
+FINALEPIC_LOCK_*
+FINALEPIC_PARK
+FINALEPIC_BAIL
+STOP
+PUMPS_STOP
+PUMPS_PARK
+pumps-dayref.json
+pumps-events.log
+pumps-trades.csv
+*_state_*.json
+*state*.json
+
+# ---------------------------------------------------------------------------
+# Build and OS noise
+# ---------------------------------------------------------------------------
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+desktop.ini
+*.rar
+*.zip
+
+# Runtime caches - regenerated on every run, machine-specific
+autosymbols-cache.json
+dip-dayref.json
+*-dayref.json
+*-cache.json
+
+# Operational runbooks - contain the live VPS IP, the SSH user and the fact
+# that the key has no passphrase. Useful locally, never published.
+VPS-DEPLOY.md
+VPS-COMMANDS.txt
