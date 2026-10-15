@@ -1305,7 +1305,16 @@ async function openLevel(price, reason, dipPct = null) {
     error(`entry L${n} did not fill — cancelled, level not counted (the resting orders are unaffected)`);
   } finally {
     placing = false;
-    consecutiveFailures = 0;
+    // consecutiveFailures is NOT reset here. This finally runs on the throw
+    // path too, so resetting it here wiped the count on every failure:
+    // handlePlaceError would increment 0 -> 1 forever, the >= 3 cooldown and
+    // the >= 10 halt below it never fired, and a bot that could not reach the
+    // exchange retried on every feed tick instead of backing off.
+    //
+    // On 2026-10-15 that produced 371,387 rate-limited depth requests - about
+    // 480/min across eight bots - which tripped Cloudflare's per-IP limit and
+    // collapsed trading from 136 closes a day to 2. The counter is now
+    // cleared only where a fill is actually recorded.
   }
 }
 
@@ -1414,6 +1423,10 @@ function recordFill({ level: n, qty, fillPrice, notional, clientOrderId, reason,
   openLongs.push({ level: n, qty, fillPrice, notional, clientOrderId, ts: Date.now() });
   level = n;
   lastAddTs = Date.now();
+
+  // A real fill is the only proof the exchange is reachable and accepting
+  // orders, so this is the one place the failure count may be cleared.
+  consecutiveFailures = 0;
 
   // The dip that triggered this add becomes the new record, so the next add
   // needs a strictly deeper one — exactly the escalation the spec asks for.
